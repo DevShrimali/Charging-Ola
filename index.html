@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ola S1 Pro Charging Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+        }
+
+        .charging-day {
+            position: relative;
+            background-color: #ecfdf5;
+            border: 1px solid #10b981;
+        }
+
+        .charging-day::after {
+            content: '⚡';
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            font-size: 0.7rem;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+
+<body class="p-4 md:p-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header Section -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-800 flex items-center gap-3">
+                    <span class="text-green-600"><i class="fas fa-bolt"></i></span>
+                    Ola S1 Pro Tracker
+                </h1>
+                <p class="text-slate-500">Monitoring energy consumption since Feb 2026</p>
+            </div>
+            <div class="flex gap-3">
+                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3">
+                    <div class="h-10 w-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
+                        <i class="fas fa-gas-pump"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400 uppercase font-bold flex items-center justify-between">
+                            Rate <button onclick="toggleRateEdit()" class="ml-2 text-slate-300 hover:text-green-600 transition-colors" title="Edit Rate"><i class="fas fa-edit"></i></button>
+                        </p>
+                        <div id="rateDisplayContainer">
+                            <p class="font-semibold text-slate-700">₹<span id="rateDisplay">4.2</span>/Unit</p>
+                            <p class="text-[10px] text-slate-400 max-w-[100px] leading-tight">Ahmedabad EV Tariff</p>
+                        </div>
+                        <div id="rateEditContainer" class="hidden mt-1">
+                            <div class="flex items-center gap-1">
+                                <span class="text-sm font-semibold text-slate-500">₹</span>
+                                <input type="number" id="rateInput" value="4.2" step="0.1" class="w-14 bg-slate-50 border border-slate-200 rounded px-1 py-0.5 text-sm font-semibold text-slate-700 outline-none focus:border-green-500">
+                                <button onclick="saveRate()" class="text-green-600 hover:text-green-700 p-1"><i class="fas fa-check-circle"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Filters Section -->
+        <div class="flex flex-col lg:flex-row lg:items-center gap-4 mb-6 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+            <span class="text-sm font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap"><i class="fas fa-filter mr-1"></i> Filter:</span>
+            <div id="monthFilters" class="flex flex-wrap gap-2 flex-grow">
+                <!-- Pills injected -->
+            </div>
+            <div class="flex gap-2 whitespace-nowrap border-t lg:border-t-0 lg:border-l border-slate-100 pt-3 lg:pt-0 lg:pl-3">
+                <button onclick="selectCurrentMonth()" class="text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-xl transition-all">Current Only</button>
+                <button onclick="selectAllMonths()" class="text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-xl transition-all">Select All</button>
+            </div>
+        </div>
+
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-all hover:shadow-md">
+                <p class="text-sm font-medium text-slate-500 mb-1">Sessions (<span class="text-xs" id="statLabelSessions">Filtered</span>)</p>
+                <h3 class="text-2xl font-bold text-slate-800" id="totalSessions">0</h3>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-all hover:shadow-md">
+                <p class="text-sm font-medium text-slate-500 mb-1">Units (<span class="text-xs" id="statLabelUnits">Filtered</span>)</p>
+                <h3 class="text-2xl font-bold text-green-600"><span id="totalUnits">0</span> <span
+                        class="text-sm font-normal text-slate-400">kWh</span></h3>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-all hover:shadow-md">
+                <p class="text-sm font-medium text-slate-500 mb-1">Est. Cost (<span class="text-xs" id="statLabelCost">Filtered</span>)</p>
+                <h3 class="text-2xl font-bold text-slate-800">₹<span id="totalCost">0</span></h3>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Calendar Column -->
+            <div class="lg:col-span-2 space-y-6" id="calendarContainer">
+                <!-- Calendars will be injected here -->
+            </div>
+
+            <!-- Details Sidebar -->
+            <div class="space-y-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-list-ul text-slate-400"></i> Recent Activity
+                    </h3>
+                    <div id="activityLog" class="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                        <!-- Log items injected here -->
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 p-6 rounded-2xl shadow-lg text-white">
+                    <h3 class="font-bold mb-2">Vehicle Profile</h3>
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="bg-slate-700 p-3 rounded-lg">
+                            <i class="fas fa-motorcycle text-2xl text-green-400"></i>
+                        </div>
+                        <div>
+                            <p class="font-medium">Ola S1 Pro</p>
+                            <p class="text-xs text-slate-400">Gen 2 Model</p>
+                        </div>
+                    </div>
+                    <div class="text-xs space-y-2 opacity-80">
+                        <div class="flex justify-between">
+                            <span>Battery</span>
+                            <span>4.0 kWh</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Range (True)</span>
+                            <span>~135 km</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let UNIT_RATE = 4.2; // Default to Ahmedabad EV Tariff
+        const START_MONTH = 1; // February (0-indexed)
+        const START_YEAR = 2026;
+
+        // State to store charging data
+        let chargingData = [];
+        let selectedMonths = new Set();
+        let availableMonthsList = [];
+
+        function getMonthKey(date) {
+            return `${date.getFullYear()}-${date.getMonth()}`;
+        }
+
+        function createSession(date) {
+            const units = parseFloat((Math.random() * (2.3 - 1.5) + 1.5).toFixed(1));
+            return {
+                date: date,
+                dateString: date.toISOString().split('T')[0],
+                units: units,
+                cost: parseFloat((units * UNIT_RATE).toFixed(2))
+            };
+        }
+
+        function generateRandomData() {
+            const now = new Date();
+            const sessions = [];
+            const usedDates = new Set();
+
+            // Explicitly add April 16 and April 19, 2026
+            const fixedDates = [
+                new Date(2026, 3, 16), // Month is 0-indexed, so 3 is April
+                new Date(2026, 3, 19)
+            ];
+
+            fixedDates.forEach(date => {
+                const session = createSession(date);
+                sessions.push(session);
+                usedDates.add(session.dateString);
+            });
+
+            // Start from Feb 1st, 2026
+            const startDate = new Date(START_YEAR, START_MONTH, 1);
+
+            // Add remaining random sessions to reach 11 total (9 original + 2 new specific)
+            while (sessions.length < 11) {
+                const randomTime = startDate.getTime() + Math.random() * (now.getTime() - startDate.getTime());
+                const randomDate = new Date(randomTime);
+                const dateKey = randomDate.toISOString().split('T')[0];
+
+                if (!usedDates.has(dateKey)) {
+                    usedDates.add(dateKey);
+                    sessions.push(createSession(randomDate));
+                }
+            }
+
+            // Sort by date descending
+            return sessions.sort((a, b) => b.date - a.date);
+        }
+
+        function createCalendar(year, month, chargeDays) {
+            const monthNames = ["January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"];
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            const container = document.createElement('div');
+            container.className = 'bg-white p-6 rounded-2xl shadow-sm border border-slate-100';
+
+            let html = `
+                <div class="flex justify-between items-center mb-4">
+                    <h4 class="font-bold text-slate-700">${monthNames[month]} ${year}</h4>
+                </div>
+                <div class="calendar-grid text-center text-xs font-bold text-slate-400 mb-2">
+                    <div>SUN</div><div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div><div>SAT</div>
+                </div>
+                <div class="calendar-grid gap-1">
+            `;
+
+            // Empty slots for start of month
+            for (let i = 0; i < firstDay; i++) {
+                html += `<div class="aspect-square"></div>`;
+            }
+
+            // Days
+            for (let day = 1; day <= daysInMonth; day++) {
+                const currentDate = new Date(year, month, day);
+                const dateKey = currentDate.toISOString().split('T')[0];
+                const chargeSession = chargeDays.find(s => s.dateString === dateKey);
+
+                const isChargeDay = !!chargeSession;
+                const classes = isChargeDay
+                    ? 'charging-day rounded-lg flex items-center justify-center font-bold text-green-700 text-sm cursor-pointer hover:scale-110 transition-transform'
+                    : 'bg-slate-50 text-slate-400 rounded-lg flex items-center justify-center aspect-square text-xs';
+
+                const title = isChargeDay ? `title="${chargeSession.units} Units | ₹${chargeSession.cost}"` : '';
+
+                html += `<div class="aspect-square ${classes}" ${title}>${day}</div>`;
+            }
+
+            html += `</div>`;
+            container.innerHTML = html;
+            return container;
+        }
+
+        function initFilters() {
+            const now = new Date();
+            let currYear = START_YEAR;
+            let currMonth = START_MONTH;
+            
+            availableMonthsList = [];
+            while (currYear < now.getFullYear() || (currYear === now.getFullYear() && currMonth <= now.getMonth())) {
+                availableMonthsList.push({ year: currYear, month: currMonth });
+                currMonth++;
+                if (currMonth > 11) {
+                    currMonth = 0;
+                    currYear++;
+                }
+            }
+            availableMonthsList.reverse();
+            
+            selectCurrentMonth();
+        }
+
+        function toggleRateEdit() {
+            const display = document.getElementById('rateDisplayContainer');
+            const edit = document.getElementById('rateEditContainer');
+            if (display.classList.contains('hidden')) {
+                display.classList.remove('hidden');
+                edit.classList.add('hidden');
+            } else {
+                display.classList.add('hidden');
+                edit.classList.remove('hidden');
+                document.getElementById('rateInput').focus();
+            }
+        }
+
+        function saveRate() {
+            const inputVal = parseFloat(document.getElementById('rateInput').value);
+            if (!isNaN(inputVal) && inputVal >= 0) {
+                UNIT_RATE = inputVal;
+                document.getElementById('rateDisplay').innerText = inputVal;
+                // update costs in data
+                chargingData.forEach(s => {
+                    s.cost = parseFloat((s.units * UNIT_RATE).toFixed(2));
+                });
+                updateUI();
+                
+                // Also update the description if it's no longer the default
+                const desc = document.querySelector('#rateDisplayContainer p:last-child');
+                if (UNIT_RATE !== 4.2) {
+                    desc.innerText = 'Custom Tariff';
+                } else {
+                    desc.innerText = 'Ahmedabad EV Tariff';
+                }
+            }
+            toggleRateEdit();
+        }
+
+        function renderMonthPills() {
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const filterContainer = document.getElementById('monthFilters');
+            
+            let html = ``;
+            availableMonthsList.forEach(m => {
+                const key = `${m.year}-${m.month}`;
+                const isActive = selectedMonths.has(key);
+                const activeClasses = 'bg-slate-800 text-white border-slate-800 shadow-md ring-2 ring-slate-800 ring-offset-1';
+                const inactiveClasses = 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300';
+                
+                html += `<button onclick="toggleMonth('${key}')" class="px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs md:text-sm font-medium border transition-all duration-200 ${isActive ? activeClasses : inactiveClasses}">${monthNames[m.month]} ${m.year}</button>`;
+            });
+            
+            filterContainer.innerHTML = html;
+        }
+
+        function toggleMonth(key) {
+            if (selectedMonths.has(key)) {
+                if (selectedMonths.size > 1) {
+                    selectedMonths.delete(key);
+                }
+            } else {
+                selectedMonths.add(key);
+            }
+            updateUI();
+        }
+
+        function selectAllMonths() {
+            selectedMonths.clear();
+            availableMonthsList.forEach(m => selectedMonths.add(`${m.year}-${m.month}`));
+            updateUI();
+        }
+
+        function selectCurrentMonth() {
+            const now = new Date();
+            selectedMonths.clear();
+            selectedMonths.add(`${now.getFullYear()}-${now.getMonth()}`);
+            updateUI();
+        }
+
+        function updateUI() {
+            renderMonthPills();
+
+            const calendarContainer = document.getElementById('calendarContainer');
+            const activityLog = document.getElementById('activityLog');
+
+            const filteredData = chargingData.filter(s => selectedMonths.has(getMonthKey(s.date)));
+
+            const totalUnits = filteredData.reduce((sum, s) => sum + s.units, 0);
+            const totalCost = filteredData.reduce((sum, s) => sum + s.cost, 0);
+
+            // Update Labels
+            const isAll = selectedMonths.size === availableMonthsList.length;
+            const labelText = isAll ? 'All Time' : (selectedMonths.size === 1 ? '1 Month' : `${selectedMonths.size} Months`);
+            document.getElementById('statLabelSessions').innerText = labelText;
+            document.getElementById('statLabelUnits').innerText = labelText;
+            document.getElementById('statLabelCost').innerText = labelText;
+
+            document.getElementById('totalSessions').innerText = filteredData.length;
+            document.getElementById('totalUnits').innerText = totalUnits.toFixed(1);
+            document.getElementById('totalCost').innerText = totalCost.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+            calendarContainer.innerHTML = '';
+            
+            availableMonthsList.forEach(m => {
+                const key = `${m.year}-${m.month}`;
+                if (selectedMonths.has(key)) {
+                    const monthCalendar = createCalendar(m.year, m.month, filteredData);
+                    calendarContainer.appendChild(monthCalendar);
+                }
+            });
+
+            if (calendarContainer.innerHTML === '') {
+                 calendarContainer.innerHTML = `<div class="bg-white p-8 rounded-2xl border border-slate-100 text-center text-slate-500">No months selected</div>`;
+            }
+
+            activityLog.innerHTML = filteredData.map(session => `
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase">${session.date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                        <p class="text-sm font-semibold text-slate-700">${session.units} Units</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-bold text-green-600">₹${session.cost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <p class="text-[10px] text-slate-400">Completed</p>
+                    </div>
+                </div>
+            `).join('');
+
+            if (filteredData.length === 0) {
+                 activityLog.innerHTML = `<div class="p-4 text-center text-sm text-slate-500">No charging activity for selected months</div>`;
+            }
+        }
+
+        window.onload = () => {
+            chargingData = generateRandomData();
+            initFilters();
+        };
+    </script>
+</body>
+
+</html>
